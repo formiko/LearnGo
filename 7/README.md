@@ -80,3 +80,44 @@ type Stringer interface {
 }
 ```
 ## 7.2 接口类型
+* 一个接口类型定义了一套方法，如果一个具体类型要实现该接口，那么必须实现接口类型定义中的所有方法
+* io.Writer是一个广泛使用的接口，它负责所有可以写入字节的类型的抽象，包括文件、内存缓冲区、网络连接、HTTP客户端、打包器（archiver）、散列器（hasher）等。
+* io包还定义了很多有用的接口。Reader就抽象了所有可以读取字节的类型，Closer抽象了所有可以关闭的类型，比如文件或者网络连接。
+``` Go
+package io
+type Reader interface {
+    Read(p []byte) (n int, err error)
+}
+type Closer interface {
+    Close() error
+}
+```
+通过组合已有接口得到新接口的语法称之为嵌入式接口，与嵌入式结构类似，让我们可以直接使用一个接口，而不用逐一写出这个接口所包含的方法：
+``` Go
+type ReadWriter interface {
+    Reader
+    Writer
+}
+type ReadWriteCloser interface {
+    Reader
+    Writer
+    Closer
+}
+
+```
+不用嵌入式来声明io.ReadWriter：
+``` Go
+type ReadWriter interface {
+    Read(p []byte) (n int, err error)
+    Write(p []byte) (n int, err error)
+}
+```
+也可以混合使用两种方式：
+``` Go
+type ReadWriter interface {
+    Read(p []byte) (n int, err error)
+    Writer
+}
+```
+三种声明的效果都是一致的。方法定义的顺序也是无意义的，真正有意义的只有接口的方法集合
+## 7.4 实现接口
