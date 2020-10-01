@@ -120,4 +120,15 @@ type ReadWriter interface {
 }
 ```
 三种声明的效果都是一致的。方法定义的顺序也是无意义的，真正有意义的只有接口的方法集合
-## 7.4 实现接口
+## 7.3 实现接口
+* 如果一个类型实现了一个接口要求的所有方法，那么这个类型实现了这个接口
+* *os.File类型实现了io.Reader、Writer、Closer和ReadWriter接口
+* *bytes.Buffer实现了Reader、Writer和ReaderWriter，但没有实现Closer，因为它没有Close方法
+* 为了简化表述，通常说一个具体“是一个”（is-a）特定的接口类型，这其实代表着该具体类型实现了该接口。比如，*bytes.Buffer是一个io.Writer；*os.File是一个io.ReaderWriter
+* 接口的赋值规则：仅当一个表达式实现了一个接口时，这个表达式才可以赋给该接口
+* 只有通过接口暴露的方法才可以调用，类型的其他方法则无法通过接口来调用
+* 因为空接口类型对其实现类型没有任何要求，所以我们可以把任何值赋给空接口类型
+* 靠空接口类型让fmt.Println、errorf这类的函数能够接受任意类型的参数
+
+## 7.4 使用flag.Value来解析参数
+
