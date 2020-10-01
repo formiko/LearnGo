@@ -41,3 +41,42 @@ type Writer interface {
   Write(p []byte) (n int, err error)
 }
 ```
+* io.Writer接口定义了Fprintf和调用者之间的约定。一方面，这个约定要求调用者提供的具体类型（比如*os.File或者*bytes.Buffer）包含一个与其签名和行为一致的Write方法。另一方面，这个约定保证了Fprintf能使用任何满足io.Writer接口的参数。
+* Fprintf只需要能调用参数的Write函数，无需假设它写入的是一个文件还是一段内存
+* 因为fmt.Fprintf仅依赖于io.Write接口所约定的方法，对参数的具体类型没有要求，所有我们可以用任何满足io.Write接口的具体类型作为fmt.Fprintf的第一个实参。
+* 这种可以把一种类型替换为满足同一接口的另一种类型的特性称为`可取代性`，这也是面向对象语言的典型特性
+创建一个新类型来测试这个特性
+``` Go
+package main
+import (
+	"fmt"
+)
+type ByteCounter int
+// 约定的方面一：调用者提供的具体类型（此处是ByteCounter）包含一个与其签名行为一致的Write方法。
+func (c *ByteCounter) Write(p []byte) (int, error) {
+	*c += ByteCounter(len(p))
+	return len(p), nil
+}
+func main() {
+	var c ByteCounter
+	c.Write([]byte("hello"))
+	fmt.Println(c) 
+
+	c = 0
+	var name = "Dolly"
+	// 约定的方面二：约定保证了Fprintf能使用任何满足io.Writer接口的参数。
+	fmt.Fprintf(&c, "hello, %s", name)
+	fmt.Println(c)
+}
+```
+除了io.Writer之外，fmt包还有另一个重要的接口。Fprintf和Fprintln提供了一个让类型控制如何输出自己的机制。定义一个String方法就可以让类型满足这个广泛使用的接口fmt.Stringer：
+``` Go
+package fmt
+// 在字符串格式化时如果需要一个字符串
+// 那么就调用这个方法来把当前值转化为字符串
+// Print 这种不带格式化参数的输出方式也是调用这个方法
+type Stringer interface {
+    String() string
+}
+```
+## 7.2 接口类型
