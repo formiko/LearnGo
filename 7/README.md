@@ -201,4 +201,96 @@ fmt.Println(sort.IntsAreSorted(values)) // "false"
 ```
 
 ## 7.7 http.Handler接口
+``` Go
+package http
 
+type Handler interface {
+    ServeHTTP(w ResponseWriter, r *Request)
+}
+
+func ListenAndServe(address string, h Handler) error
+```
+* ListenAndServe函数需要一个服务器地址，比如"localhost:8000"，以及一个Handler接口的实例（用来接受所有的请求）。这个函数会一直运行，知道服务出错（或者启动时就失败了）时返回一个非空的错误
+* 更真实的服务器会定义多个不同的URL，每一个都会触发一个不同的行为
+``` Go
+func (db database) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+    switch req.URL.Path {
+    case "/list":
+        for item, price := range db {
+            fmt.Fprintf(w, "%s: %s\n", item, price)
+        }
+    case "/price":
+        item := req.URL.Query().Get("item")
+        price, ok := db[item]
+        if !ok {
+            w.WriteHeader(http.StatusNotFound) // 404
+            fmt.Fprintf(w, "no such item: %q\n", item)
+            return
+        }
+        fmt.Fprintf(w, "%s\n", price)
+    default:
+        w.WriteHeader(http.StatusNotFound) // 404
+        fmt.Fprintf(w, "no such page: %s\n", req.URL)
+    }
+}
+```
+* net/http包提供了一个`请求多工转发器ServeMux`，用来简化URL和处理程序之间的关联。一个ServeMux把多个http.Handler组合成单个http.Handler。
+``` Go
+func main() {
+    db := database{"shoes": 50, "socks": 5}
+    mux := http.NewServeMux()
+    mux.Handle("/list", http.HandlerFunc(db.list))
+    mux.Handle("/price", http.HandlerFunc(db.price))
+    log.Fatal(http.ListenAndServe("localhost:8000", mux))
+}
+
+type database map[string]dollars
+
+func (db database) list(w http.ResponseWriter, req *http.Request) {
+    for item, price := range db {
+        fmt.Fprintf(w, "%s: %s\n", item, price)
+    }
+}
+
+func (db database) price(w http.ResponseWriter, req *http.Request) {
+    item := req.URL.Query().Get("item")
+    price, ok := db[item]
+    if !ok {
+        w.WriteHeader(http.StatusNotFound) // 404
+        fmt.Fprintf(w, "no such item: %q\n", item)
+        return
+    }
+    fmt.Fprintf(w, "%s\n", price)
+}
+```
+当调用db.list时，等价于以db为接受者调用database.list方法。所以db.list是一个实现了处理功能的函数（而不是一个实例），因为它没有接口所需的方法，所以它不满足http.Handler接口，也不能直接传给mux.Handler。  
+表达式http.HandleFunc(db.list)其实是类型转换，而不是函数调用。注意，http.HandleFunc是一个类型。它有如下定义：
+``` Go
+package http
+
+type HandlerFunc func(w ResponseWriter, r *Request)
+
+func (f HandlerFunc) ServeHTTP(w ResponseWriter, r *Request) {
+    f(w, r)
+}
+```
+HandlerFunc演示了Go语言接口机制的一些不常见特性。它不仅是一个函数类型，还拥有自己的方法，也满足接口http.Handler。它的ServeHTTP方法就调用函数本身，所以HandlerFunc就是一个让函数值满足接口的一个适配器，在这个例子中，函数和接口的唯一方法拥有同样的签名。这个小技巧让database类型可以用不同的方式来满足http.Handler接口：一次通过list方法，一次通过price方法，依次类推。  
+因为这种注册处理程序的方法太常见了，所以ServeMux引入了一个HandleFunc便捷方法来简化调用，处理程序注册部分的代码可以简化为如下形式：
+``` Go
+mux.HandleFunc("/list", db.list)
+mux.HandleFunc("/price", db.price)
+```
+* 对于一个更复杂的应用，多个ServeMux会组合起来，用来处理更复杂的分发需求。
+* 从上面的代码很容易看出应该怎么构建一个程序：由两个不同的web服务器监听不同的端口，并且定义不同的URL将它们指派到不同的handler。我们只要构建另外一个ServeMux并且再调用一次ListenAndServe（可能并行的）。但是在大多数程序中，一个web服务器就足够了。此外，在一个应用程序的多个文件中定义HTTP handler也是非常典型的，如果它们必须全部都显式地注册到这个应用的ServeMux实例上会比较麻烦。
+所以为了方便，net/http包提供了一个全局的ServeMux实例DefaultServerMux和包级别的http.Handle和http.HandleFunc函数。现在，为了使用DefaultServeMux作为服务器的主handler，我们不需要将它传给ListenAndServe函数；nil值就可以工作。
+然后服务器的主函数可以简化成：
+``` Go
+func main() {
+    db := database{"shoes": 50, "socks": 5}
+    http.HandleFunc("/list", db.list)
+    http.HandleFunc("/price", db.price)
+    log.Fatal(http.ListenAndServe("localhost:8000", nil))
+}
+```
+
+## 7.8 error接口
