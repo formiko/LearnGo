@@ -131,7 +131,16 @@ type ReadWriter interface {
 * 靠空接口类型让fmt.Println、errorf这类的函数能够接受任意类型的参数
 
 ## 7.4 使用flag.Value来解析参数
+``` Go
+var period = flag.Duration("period", 1*time.Second, "sleep period")
 
+func main() {
+    flag.Parse()
+    fmt.Printf("Sleeping for %v...", *period)
+    time.Sleep(*period)
+    fmt.Println()
+}
+```
 ## 7.5 接口值
 * 从概念上来讲，一个接口类型的值（简称接口值）其实有两个部分：一个具体类型和该类型的一个值。二者称为接口的`动态类型`和`动态值`
 * 接口的零值就是把它的动态类型和值都设置为nil
