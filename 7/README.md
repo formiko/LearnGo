@@ -281,9 +281,9 @@ mux.HandleFunc("/list", db.list)
 mux.HandleFunc("/price", db.price)
 ```
 * 对于一个更复杂的应用，多个ServeMux会组合起来，用来处理更复杂的分发需求。
-* 从上面的代码很容易看出应该怎么构建一个程序：由两个不同的web服务器监听不同的端口，并且定义不同的URL将它们指派到不同的handler。我们只要构建另外一个ServeMux并且再调用一次ListenAndServe（可能并行的）。但是在大多数程序中，一个web服务器就足够了。此外，在一个应用程序的多个文件中定义HTTP handler也是非常典型的，如果它们必须全部都显式地注册到这个应用的ServeMux实例上会比较麻烦。
-所以为了方便，net/http包提供了一个全局的ServeMux实例DefaultServerMux和包级别的http.Handle和http.HandleFunc函数。现在，为了使用DefaultServeMux作为服务器的主handler，我们不需要将它传给ListenAndServe函数；nil值就可以工作。
-然后服务器的主函数可以简化成：
+* 从上面的代码很容易看出应该怎么构建一个程序：由两个不同的web服务器监听不同的端口，并且定义不同的URL将它们指派到不同的handler。我们只要构建另外一个ServeMux并且再调用一次ListenAndServe（可能并行的）。但是在大多数程序中，一个web服务器就足够了。此外，在一个应用程序的多个文件中定义HTTP handler也是非常典型的，如果它们必须全部都显式地注册到这个应用的ServeMux实例上会比较麻烦。  
+所以为了方便，net/http包提供了一个全局的ServeMux实例DefaultServerMux和包级别的http.Handle和http.HandleFunc函数。现在，为了使用DefaultServeMux作为服务器的主handler，我们不需要将它传给ListenAndServe函数；nil值就可以工作。  
+然后服务器的主函数可以简化成：  
 ``` Go
 func main() {
     db := database{"shoes": 50, "socks": 5}
@@ -294,3 +294,31 @@ func main() {
 ```
 
 ## 7.8 error接口
+``` Go
+type error interface {
+    Error() string
+}
+```
+构造error最简单的方法是调用errors.New，它会返回一个包含指定的错误消息的新error实例。完整的error包只有如下4行代码：
+``` Go
+package errors
+
+func New(text string) error { return &errorString{text} }
+
+type errorString struct { text string }
+
+func (e *errorString) Error() string { return e.text }
+```
+直接调用errors.New比较罕见，因为有一个更易用的封装函数fmt.Errorf，它还额外提供了字符串格式化功能。
+``` Go
+package fmt
+
+import "errors"
+
+func Errorf(format string, args ...interface{}) error {
+    return errors.New(Sprintf(format, args...))
+}
+```
+
+## 7.9 示例：表达式求值器
+
