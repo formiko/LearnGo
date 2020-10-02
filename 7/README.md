@@ -141,3 +141,55 @@ type ReadWriter interface {
 * 一个接口值可以指向多个任意大的动态值。从理论上来讲，无论动态值有多大，它永远在接口值内部（当然这只是一个理论模型；实际的实现是很不同的）
 * 接口值可以用 == 和 != 操作符来做比较。如果两个接口值都是nil或者二者的动态类型完全一致且二者动态值相等（使用动态类型 == 操作符来做比较），那么两个接口值相等。因为接口值是可以比较的，所以它们可以作为map的键，也可以作为switch语句的操作数
 * 在比较两个接口值时，如果两个接口值的动态类型一致，但对应的动态值是不可比较的（比如slice），那么这个比较会以崩溃的方式失败 
+
+## 7.6 使用sort.Interface来排序
+* Go语言的sort.Sort函数对序列和其中元素的布局无任何要求，它使用sort.Interface接口来指定通用排序算法和每个具体的序列类型之间的协议
+* 一个原地排序算法需要知道三个信息：序列长度、比较两个元素的含义以及如何交换两个元素，所以sort.Interface接口就有三个方法：
+``` Go
+package main
+type Interface interface {
+	Len() int
+	Less(i, j int)	bool
+	Swap(i, j int)
+}
+```
+* 实现了sort.Interface的具体类型不一定是切片类型；customSort是一个结构体类型
+``` Go
+type customSort struct {
+    t    []*Track
+    less func(x, y *Track) bool
+}
+
+func (x customSort) Len() int           { return len(x.t) }
+func (x customSort) Less(i, j int) bool { return x.less(x.t[i], x.t[j]) }
+func (x customSort) Swap(i, j int)    { x.t[i], x.t[j] = x.t[j], x.t[i] }
+```
+* 让我们定义一个多层的排序函数，它主要的排序键是标题，第二个键是年，第三个键是运行时间Length。下面是该排序的调用，其中这个排序使用了匿名排序函数：
+``` Go
+sort.Sort(customSort{tracks, func(x, y *Track) bool {
+    if x.Title != y.Title {
+        return x.Title < y.Title
+    }
+    if x.Year != y.Year {
+        return x.Year < y.Year
+    }
+    if x.Length != y.Length {
+        return x.Length < y.Length
+    }
+    return false
+}})
+```
+* 尽管对长度为n的序列排序需要 O(n log n)次比较操作，检查一个序列是否已经有序至少需要n-1次比较。sort包中的IsSorted函数帮我们做这样的检查。像sort.Sort一样，它也使用sort.Interface对这个序列和它的排序函数进行抽象，但是它从不会调用Swap方法：这段代码示范了IntsAreSorted和Ints函数在IntSlice类型上的使用：
+``` Go
+values := []int{3, 1, 4, 1}
+fmt.Println(sort.IntsAreSorted(values)) // "false"
+sort.Ints(values)
+fmt.Println(values)                     // "[1 1 3 4]"
+fmt.Println(sort.IntsAreSorted(values)) // "true"
+sort.Sort(sort.Reverse(sort.IntSlice(values)))
+fmt.Println(values)                     // "[4 3 1 1]"
+fmt.Println(sort.IntsAreSorted(values)) // "false"
+```
+
+## 7.7 http.Handler接口
+
