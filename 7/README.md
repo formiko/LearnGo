@@ -392,5 +392,31 @@ func formatOneValue(x interface{}) string {
 
 ## 7.13 类型分支
 * 接口有两种不同风格分别对应`子类型多态`和`特设多态`
+* 一个switch语句可以把包含一长串值相等比较的if-else语句简化掉。一个相似的类型分支（type switch）语句则可以用来简化一长串的类型断言if-else语句
+``` Go
+func sqlQuote(x interface{}) string {
+  switch x := x.(type) {
+    case nil:
+      return "NULL"
+    case int, uint:
+      return fmt.Sprintf("%d", x) // 这里 x 类型为 interface{}
+    case bool:
+      if x {
+        return "TRUE"
+      }
+      return "FALSE"
+    case string:
+      return sqlQuoteString(x) // （未显示具体代码）
+    default:
+      panic(fmt.Sprintf("unexpected type %T: %v", x, x))
+  }
+}
+```
 
+## 7.14 示例：基于标记的XML解析
+
+## 一些建议
+* 仅在有两个或者多个具体类型需要按统一的方式处理时才需要接口
+* 例外：如果接口和类型实现出于依赖的原因不能放在同一个包里边，那么一个接口只有一个具体类型实现也是可以的。在这种情况下，接口是一种解耦两个包的好方式
+* 设计新类型时越小的接口越容易满足。一个不错的接口设计经验是仅要求你需要的
 
