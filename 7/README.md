@@ -322,3 +322,75 @@ func Errorf(format string, args ...interface{}) error {
 
 ## 7.9 示例：表达式求值器
 
+## 7.10 类型断言
+* 类型断言是一个作用在接口值上的操作，写出来类似于x.(T)，其中x是一个接口类型的表达式，而T是一个类型（称为断言类型）。类型断言会检查作为操作数的动态类型是否满足指定的断言类型
+* 如果断言类型T是一个具体类型，作用是从它的操作数中把具体类型的值提取出来
+* 如果断言类型T是一个接口类型，作用是从一个接口类型变为拥有另外一套方法的接口类型（通常方法数量增多），但保留了接口值中的动态类型和动态值部分
+* 如果类型断言出现在需要两个结果的赋值表达式中，那么断言不会在失败时崩溃，而是会多返回一个布尔型的返回值来指示断言是否成功
+``` Go
+var w io.Writer = os.Stdout
+f, ok := w.(*os.File) // 成功：ok, f == os.Stdout
+b, ok := w.(*bytes.Buffer) // 失败：!ok, b == nil
+```
+## 7.11 使用类型断言来识别错误
+``` Go
+import (
+  "errors"
+  "syscall"
+)
+var ErrNotExist = errors.New("file does not exist")
+
+func IsNotExist(err error) bool {
+  if pe, ok := err.(*PathError); ok {
+    err = pe.Err
+  }
+  return err == syscall.ENOENT || err == ErrNotExist
+}
+
+// 实际调用
+_, err := os.Open("/no/such/file")
+fmt.Println(os..IsNotExist(err)) // "true"
+```
+
+## 7.12 通过接口类型断言来查询特性
+* 我们无法假定任意一个io.Writer w 也有WriteString方法。但可以定义一个新的接口，这个接口只包含WriteString方法，然后使用类型断言来判断w的动态类型是否满足这个新接口
+``` Go
+// writeString 将 s 写入 w
+// 如果 w 有 WriteString 方法，那么将直接调用该方法
+func writeString(w io.Writer, s string) (n int, err error) {
+  type stringWriter interface {
+    WriteString(string) (n int, err error)
+  }
+  if sw, ok := w.(stringWriter); ok {
+    return sw.WriteString(s) // 避免了内存复制
+  }
+  return w.Write([]byte(s)) // 分配了临时内存
+}
+
+func writeHeader(w io.Writer, contentType string) error {
+  if _, err := writeString(w, "Content-type: "); err != nil {
+    return err
+  }
+}
+```
+
+* 这个方法也用在了fmt.Printf中，用于从通用类型中识别出error或者fmt.Stringer。在fmt.Fprintf内部，有一步是把单个操作数转换为一个字符串，如下所示：
+``` Go
+package fmt
+
+func formatOneValue(x interface{}) string {
+  if err, ok := x.(error); ok {
+    return err.Error()
+  }
+  if str, ok := x.(Stringer); ok {
+    return str.String()
+  }
+  // ... 所有其他类型
+}
+```
+如果x满足这两种接口中的一个，就直接确定格式化方法。如果不满足，默认处理部分大致会使用反射来处理所有其他类型。
+
+## 7.13 类型分支
+* 接口有两种不同风格分别对应`子类型多态`和`特设多态`
+
+
